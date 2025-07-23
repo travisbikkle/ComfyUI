@@ -152,6 +152,11 @@ jobs:
           python_embeded/python.exe -s ./update/update.py ComfyUI/
 
           ls
+
+          # === 安装 insightface 本地 whl ===
+          echo "Installing insightface for Python 3.${python_minor}..."
+          python_embeded/python.exe -m pip install .ci/insightface/insightface-*-cp3${python_minor}-*.whl
+
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
