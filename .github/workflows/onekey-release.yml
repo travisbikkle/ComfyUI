@@ -110,21 +110,13 @@ jobs:
           mkdir python_src
           tar -xf python_src.tar.xz -C python_src --strip-components=1
 
-          echo "Copying Include/ to python_embeded/include"
-          mkdir -p python_embeded/include
-          cp -r python_src/Include/* python_embeded/include/
+          echo "Copying Include/ to python_embeded/Include"
+          mkdir -p python_embeded/Include
+          cp -r python_src/Include/* python_embeded/Include/
 
-          if [ -d python_src/PCbuild/amd64 ]; then
-            echo "Copying PCbuild/amd64/*.lib to python_embeded/libs"
-            mkdir -p python_embeded/libs
-            cp python_src/PCbuild/amd64/*.lib python_embeded/libs/ || true
-          else
-            echo "WARNING: PCbuild/amd64 not found, skipping libs copy"
-          fi
-
-          echo "Headers and libs extraction complete."
-          ls -l python_embeded/include || true
-          ls -l python_embeded/libs || true
+          echo "Copying Lib/ to python_embeded/Lib"
+          mkdir -p python_embeded/Lib
+          cp -r python_src/Lib/* python_embeded/Lib/
 
           cd python_embeded
           echo ${{ env.MINOR_VERSION }}
