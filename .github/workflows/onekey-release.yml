@@ -103,21 +103,6 @@ jobs:
           curl https://www.python.org/ftp/python/3.${{ inputs.python_minor }}.${{ inputs.python_patch }}/python-3.${{ inputs.python_minor }}.${{ inputs.python_patch }}-embed-amd64.zip -o python_embeded.zip
           unzip python_embeded.zip -d python_embeded
 
-          # === 下载源码包提取头文件和库 ===
-          PY_VER=3.${{ inputs.python_minor }}.${{ inputs.python_patch }}
-          echo "Downloading python-$PY_VER.tar.xz (source tarball for headers/libs)..."
-          curl -L -o python_src.tar.xz https://www.python.org/ftp/python/$PY_VER/Python-$PY_VER.tar.xz
-          mkdir python_src
-          tar -xf python_src.tar.xz -C python_src --strip-components=1
-
-          echo "Copying Include/ to python_embeded/Include"
-          mkdir -p python_embeded/Include
-          cp -r python_src/Include/* python_embeded/Include/
-
-          echo "Copying Lib/ to python_embeded/Lib"
-          mkdir -p python_embeded/Lib
-          cp -r python_src/Lib/* python_embeded/Lib/
-
           cd python_embeded
           echo ${{ env.MINOR_VERSION }}
           echo 'import site' >> ./python3${{ inputs.python_minor }}._pth
