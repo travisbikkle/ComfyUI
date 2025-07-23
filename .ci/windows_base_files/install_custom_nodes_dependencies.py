@@ -7,71 +7,7 @@ import yaml
 import subprocess
 from pathlib import Path
 import logging
-
-def get_user_choice():
-    """获取用户选择的 ComfyUI 版本和路径"""
-    logging.info("=== ComfyUI Custom Nodes Dependencies Installer ===")
-    logging.info("")
-    logging.info("请选择 ComfyUI 版本类型：")
-    logging.info("1. 便携版 (Portable)")
-    logging.info("2. 桌面版 (Desktop)")
-    logging.info("")
-    
-    while True:
-        try:
-            choice = input("请输入选择 (1 或 2): ").strip()
-            if choice == "1":
-                return "portable"
-            elif choice == "2":
-                return "desktop"
-            else:
-                logging.warning("无效选择，请输入 1 或 2")
-        except KeyboardInterrupt:
-            logging.warning("\n用户取消操作")
-            sys.exit(1)
-
-def get_portable_path():
-    """获取便携版路径"""
-    logging.info("")
-    logging.info("=== 便携版配置 ===")
-    logging.info("请输入 ComfyUI 便携版的根目录路径")
-    logging.info("例如: D:\\ComfyUI_windows_portable")
-    logging.info("")
-    
-    while True:
-        try:
-            path = input("ComfyUI 便携版路径: ").strip().strip('"')
-            if not path:
-                logging.warning("路径不能为空")
-                continue
-            
-            # 检查路径是否存在
-            if not os.path.exists(path):
-                logging.warning(f"路径不存在: {path}")
-                continue
-            
-            # 检查是否有 python_embeded 目录
-            python_embeded_path = os.path.join(path, "python_embeded")
-            if not os.path.exists(python_embeded_path):
-                logging.warning(f"未找到 python_embeded 目录: {python_embeded_path}")
-                logging.warning("请确认这是正确的 ComfyUI 便携版目录")
-                continue
-            
-            return path
-        except KeyboardInterrupt:
-            logging.warning("\n用户取消操作")
-            sys.exit(1)
-
-def get_desktop_config_path():
-    """获取桌面版配置文件路径"""
-    import platform
-    if platform.system() == "Windows":
-        user_dir = os.path.expanduser("~")
-        return os.path.join(user_dir, "AppData", "Roaming", "ComfyUI", "extra_models_config.yaml")
-    else:
-        # Linux/Mac 支持
-        user_dir = os.path.expanduser("~")
-        return os.path.join(user_dir, ".config", "ComfyUI", "extra_models_config.yaml")
+import re
 
 def load_yaml_config(yaml_path):
     """加载 YAML 配置文件"""
@@ -84,66 +20,32 @@ def load_yaml_config(yaml_path):
         logging.warning(f"[WARN] Failed to load {yaml_path}: {e}")
         return {}
 
-def get_paths(version_type, portable_path=None):
-    """获取 base_path 和 custom_nodes 路径"""
-    if version_type == "portable":
-        logging.info("使用便携版配置...")
-        # 便携版：从指定目录的 extra_model_paths.yaml 读取
-        if portable_path is None:
-            raise ValueError("portable_path cannot be None for portable version")
-        default_base_path = os.path.join(portable_path, "ComfyUI")
-        default_custom_nodes = os.path.join(portable_path, "ComfyUI", "custom_nodes")
-        yaml_path = os.path.join(portable_path, "ComfyUI", "extra_model_paths.yaml")
-        config = load_yaml_config(yaml_path)
-        
-        # 优先查找 comfyui 块
-        comfyui_block = config.get("comfyui", {}) if isinstance(config, dict) else {}
-        base_path = comfyui_block.get('base_path', default_base_path)
-        custom_nodes_path = comfyui_block.get('custom_nodes', default_custom_nodes)
-    else:
-        logging.info("使用桌面版配置...")
-        # 桌面版：从用户目录的 extra_models_config.yaml 读取
-        yaml_path = get_desktop_config_path()
-        config = load_yaml_config(yaml_path)
-        
-        # 查找 comfyui_desktop 块
-        comfyui_desktop_block = config.get("comfyui_desktop", {}) if isinstance(config, dict) else {}
-        base_path = comfyui_desktop_block.get('base_path', "ComfyUI")
-        custom_nodes_path = comfyui_desktop_block.get('custom_nodes', "custom_nodes/")
-        
-        # 桌面版的 custom_nodes 是相对路径，需要和 base_path 拼接
-        if not os.path.isabs(custom_nodes_path):
-            custom_nodes_path = os.path.join(base_path, custom_nodes_path)
+def get_paths(portable_path):
+    """获取 base_path 和 custom_nodes 路径 (仅便携版)"""
+    default_base_path = os.path.join(portable_path, "ComfyUI")
+    default_custom_nodes = os.path.join(portable_path, "ComfyUI", "custom_nodes")
+    yaml_path = os.path.join(portable_path, "ComfyUI", "extra_model_paths.yaml")
+    config = load_yaml_config(yaml_path)
     
-    # 兼容绝对/相对路径
+    comfyui_block = config.get("comfyui", {}) if isinstance(config, dict) else {}
+    base_path = comfyui_block.get('base_path', default_base_path)
+    custom_nodes_path = comfyui_block.get('custom_nodes', default_custom_nodes)
+
     if not os.path.isabs(base_path):
         base_path = os.path.abspath(base_path)
     if not os.path.isabs(custom_nodes_path):
-        custom_nodes_path = os.path.abspath(custom_nodes_path)
+        custom_nodes_path = os.path.join(base_path, custom_nodes_path)
     
     return base_path, custom_nodes_path
 
-def get_venv_python(base_path):
-    """获取虚拟环境 Python 路径"""
-    if os.name == 'nt':  # Windows
-        venv_python = os.path.join(base_path, ".venv", "Scripts", "python.exe")
-    else:  # Linux/Mac
-        venv_python = os.path.join(base_path, ".venv", "bin", "python")
-    
-    if not os.path.exists(venv_python):
-        raise FileNotFoundError(f"Python venv not found: {venv_python}")
-    
-    return venv_python
-
 def replace_git_urls(content, github_mirror_prefix):
-    """替换 requirements.txt 中的 GitHub URLs"""
-    return content.replace('@git+https://github.com/', f'@{github_mirror_prefix}git+https://github.com/')
+    # 替换所有 git+https://github.com/ 为 git+https://ghproxy.com/https://github.com/
+    return re.sub(r'git\+https://github\.com/', f'git+{github_mirror_prefix}https://github.com/', content)
 
-def install_requirements(venv_python, req_file, github_mirror_prefix, pip_mirror_url):
+def install_requirements(python_exec, req_file, github_mirror_prefix, pip_mirror_url):
     """安装单个 requirements.txt 文件"""
     logging.info(f"Processing requirements: {req_file}")
     
-    # 检查文件是否存在且非空
     if not os.path.exists(req_file):
         logging.info(f"  [INFO] {req_file} does not exist, skipping.")
         return
@@ -153,73 +55,68 @@ def install_requirements(venv_python, req_file, github_mirror_prefix, pip_mirror
         logging.info(f"  [INFO] {req_file} is empty, skipping.")
         return
     
-    # 读取并替换 GitHub URLs
     try:
         with open(req_file, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # 替换 GitHub URLs
         modified_content = replace_git_urls(content, github_mirror_prefix)
         
-        # 创建临时文件
         temp_file = req_file + ".mirrored"
         with open(temp_file, 'w', encoding='utf-8') as f:
             f.write(modified_content)
         
         try:
-            # 安装依赖
-            subprocess.run([venv_python, "-m", "pip", "install", "-r", temp_file, "--index-url", pip_mirror_url], 
+            print(f" =============={req_file}====================\n{modified_content}\n===============================");
+            subprocess.run([python_exec, "-m", "pip", "install", "-r", temp_file, "--index-url", pip_mirror_url], 
                          check=True)
-            
         finally:
-            # 清理临时文件
             if os.path.exists(temp_file):
-                os.remove(temp_file)
+                pass
+                # os.remove(temp_file)
                 
     except Exception as e:
         logging.error(f"  [ERROR] Failed to process {req_file}: {e}")
 
 def main():
-    """主函数"""
-    # 镜像前缀配置
+    """主函数 (仅支持便携版，默认当前路径，直接用python_embeded)"""
     github_mirror_prefix = "https://ghproxy.com/"
     pip_mirror_url = "https://pypi.tuna.tsinghua.edu.cn/simple"
     
     try:
-        # 获取用户选择
-        version_type = get_user_choice()
-        
-        # 如果是便携版，获取路径
-        portable_path = None
-        if version_type == "portable":
-            portable_path = get_portable_path()
-        
-        # 获取路径
-        base_path, custom_nodes_path = get_paths(version_type, portable_path)
+        portable_path = os.getcwd()
+        base_path, custom_nodes_path = get_paths(portable_path)
         logging.info(f"Using base_path: {base_path}")
         logging.info(f"Using custom_nodes directory: {custom_nodes_path}")
-        
-        # 获取虚拟环境 Python
-        venv_python = get_venv_python(base_path)
-        logging.info(f"Using Python: {venv_python}")
-        
-        # 只升级一次 pip
-        logging.info("Upgrading pip in venv ...")
-        subprocess.run([venv_python, "-m", "pip", "install", "--upgrade", "pip", "--index-url", pip_mirror_url], 
+
+        # 直接用 python_embeded 下的 python 解释器
+        if os.name == 'nt':
+            python_exec = os.path.join(portable_path, "python_embeded", "python.exe")
+        else:
+            python_exec = os.path.join(portable_path, "python_embeded", "bin", "python")
+
+        if not os.path.exists(python_exec):
+            logging.error(f"[ERROR] Python executable not found: {python_exec}")
+            return 1
+
+        logging.info(f"Using Python: {python_exec}")
+        logging.info("Upgrading pip ...")
+
+        subprocess.run([python_exec, "-m", "pip", "install", "cython", "--index-url", pip_mirror_url], 
+                    check=True, capture_output=True)
+
+        subprocess.run([python_exec, "-m", "pip", "install", "--upgrade", "pip", "--index-url", pip_mirror_url], 
                      check=True, capture_output=True)
         
-        # 检查 custom_nodes 目录是否存在
         if not os.path.exists(custom_nodes_path):
             logging.error(f"[ERROR] Directory {custom_nodes_path} does not exist!")
             return 1
         
-        # 遍历一级子目录
         custom_nodes_dir = Path(custom_nodes_path)
         for subdir in custom_nodes_dir.iterdir():
             if subdir.is_dir():
                 req_file = subdir / "requirements.txt"
                 if req_file.exists():
-                    install_requirements(str(venv_python), str(req_file), github_mirror_prefix, pip_mirror_url)
+                    install_requirements(str(python_exec), str(req_file), github_mirror_prefix, pip_mirror_url)
         
         logging.info("Installation completed successfully!")
         return 0
