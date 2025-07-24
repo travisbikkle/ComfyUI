@@ -186,10 +186,7 @@ def get_total_memory(dev=None, torch_total_too=False):
         elif is_intel_xpu():
             stats = torch.xpu.memory_stats(dev)
             mem_reserved = stats['reserved_bytes.all.current']
-            if torch_version_numeric < (2, 6):
-                mem_total_xpu = torch.xpu.get_device_properties(dev).total_memory
-            else:
-                _, mem_total_xpu = torch.xpu.mem_get_info(dev)
+            mem_total_xpu = torch.xpu.get_device_properties(dev).total_memory
             mem_total_torch = mem_reserved
             mem_total = mem_total_xpu
         elif is_ascend_npu():
@@ -311,7 +308,10 @@ try:
         logging.info("ROCm version: {}".format(rocm_version))
         if args.use_split_cross_attention == False and args.use_quad_cross_attention == False:
             if torch_version_numeric >= (2, 7):  # works on 2.6 but doesn't actually seem to improve much
-                if any((a in arch) for a in ["gfx90a", "gfx942", "gfx1100", "gfx1101", "gfx1151"]):  # TODO: more arches, TODO: gfx1201 and gfx950
+                if any((a in arch) for a in ["gfx90a", "gfx942", "gfx1100", "gfx1101", "gfx1151"]):  # TODO: more arches, TODO: gfx950
+                    ENABLE_PYTORCH_ATTENTION = True
+            if torch_version_numeric >= (2, 8):
+                if any((a in arch) for a in ["gfx1201"]):
                     ENABLE_PYTORCH_ATTENTION = True
         if torch_version_numeric >= (2, 7) and rocm_version >= (6, 4):
             if any((a in arch) for a in ["gfx1201", "gfx942", "gfx950"]):  # TODO: more arches
@@ -880,6 +880,7 @@ def vae_dtype(device=None, allowed_dtypes=[]):
             return d
 
         # NOTE: bfloat16 seems to work on AMD for the VAE but is extremely slow in some cases compared to fp32
+        # slowness still a problem on pytorch nightly 2.9.0.dev20250720+rocm6.4 tested on RDNA3
         if d == torch.bfloat16 and (not is_amd()) and should_use_bf16(device):
             return d
 
@@ -1109,10 +1110,7 @@ def get_free_memory(dev=None, torch_free_too=False):
             stats = torch.xpu.memory_stats(dev)
             mem_active = stats['active_bytes.all.current']
             mem_reserved = stats['reserved_bytes.all.current']
-            if torch_version_numeric < (2, 6):
-                mem_free_xpu = torch.xpu.get_device_properties(dev).total_memory - mem_reserved
-            else:
-                mem_free_xpu, _ = torch.xpu.mem_get_info(dev)
+            mem_free_xpu = torch.xpu.get_device_properties(dev).total_memory - mem_reserved
             mem_free_torch = mem_reserved - mem_active
             mem_free_total = mem_free_xpu + mem_free_torch
         elif is_ascend_npu():
