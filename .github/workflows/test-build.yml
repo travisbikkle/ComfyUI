@@ -6,10 +6,11 @@ name: Build package
 #
 
 on:
-  push:
-    paths:
-      - "requirements.txt"
-      - ".github/workflows/test-build.yml"
+  workflow_dispatch:
+  # push:
+  #   paths:
+  #     - "requirements.txt"
+  #     - ".github/workflows/test-build.yml"
 
 jobs:
   build:

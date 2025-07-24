@@ -2,8 +2,9 @@
 # Results are reported as checkmarks on the commits, as well as onto https://ci.comfy.org/
 name: Pull Request CI Workflow Runs
 on:
-    pull_request_target:
-        types: [labeled]
+  workflow_dispatch:
+    # pull_request_target:
+    #     types: [labeled]
 
 jobs:
   pr-test-stable:
